@@ -425,6 +425,7 @@ void *logging_thread(void *arg)
 int child_fn(void *arg)
 {
     child_config_t *cfg = (child_config_t *)arg;
+    setpgid(0, 0);
     char *shell_argv[] = {(char *)"/bin/sh", (char *)"-c", cfg->command, NULL};
     int rc;
 
@@ -1150,6 +1151,11 @@ static int run_supervisor(const char *rootfs)
                     if (container->state == CONTAINER_RUNNING) {
                         container->stop_requested = 1;
                         kill(container->host_pid, SIGTERM);
+                        sleep(1);
+                        
+                        if(kill(container->host_pid, 0) ==0){
+                        	kill(container->host_pid, SIGKILL);
+                        }
                         snprintf(resp.message, sizeof(resp.message), "Stopped container %s",
                                 req.container_id);
                     } else {
@@ -1180,8 +1186,15 @@ next_request:
     pthread_mutex_lock(&ctx.metadata_lock);
     for (container = ctx.containers; container; container = container->next) {
         if (container->state == CONTAINER_RUNNING) {
+            container->stop_requested =1;
             kill(container->host_pid, SIGTERM);
+            sleep(1);
+            
+            if(kill(container->host_pid, 0) ==0) {
+            	kill(container->host_pid, SIGKILL);
         }
+            container->state =CONTAINER_STOPPED;
+            }
     }
     pthread_mutex_unlock(&ctx.metadata_lock);
 
